@@ -3,12 +3,12 @@ DOMAIN = "aula104.local"
 DNSIP = "192.168.1.12"
 LAB = "bind9"
 
-$apache_provision = <<-SHELL
+$apache = <<-SHELL
   sudo apt update
   sudo apt-get -y install apache2
 SHELL
 
-$nginx_provision = <<-SHELL
+$nginx = <<-SHELL
   sudo apt update
   sudo apt -y install nginx
   SHELL
@@ -18,9 +18,9 @@ $dnsclient = <<-SHELL
 SHELL
 
 services ={
-  "apache1"=>{:ip=>"192.168.1.15", :provision=>$apache_provision},
-  "apache2"=>{:ip=>"192.168.1.10", :provision=>$apache_provision},
-  "nginx"=>{:ip=>"192.168.1.25", :provision=>$nginx_provision},
+  "apache1"=>{:ip=>"192.168.1.15", :provision=>$apache},
+  "apache2"=>{:ip=>"192.168.1.10", :provision=>$apache},
+  "nginx"=>{:ip=>"192.168.1.25", :provision=>$nginx},
 }
 
 Vagrant.configure("2") do |config|
