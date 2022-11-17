@@ -1,15 +1,27 @@
-# -- mode: ruby --
-# vi: set ft=ruby :
 BOX_IMAGE = "ubuntu/focal64"
 DOMAIN = "aula104.local"
 DNSIP = "192.168.1.12"
 LAB = "bind9"
 
-$dnsclient = <<-SHELL
+$apache_provision = <<-SHELL
+  sudo apt update
+  sudo apt-get -y install apache2
+SHELL
 
+$nginx_provision = <<-SHELL
+  sudo apt update
+  sudo apt -y install nginx
+  SHELL
+
+$dnsclient = <<-SHELL
   echo -e "nameserver $1\ndomain aula104.local">/etc/resolv.conf
 SHELL
 
+services ={
+  "apache1"=>{:ip=>"192.168.1.15", :provision=>$apache_provision},
+  "apache2"=>{:ip=>"192.168.1.10", :provision=>$apache_provision},
+  "nginx"=>{:ip=>"192.168.1.25", :provision=>$nginx_provision},
+}
 
 Vagrant.configure("2") do |config|
   # config general
@@ -20,21 +32,10 @@ Vagrant.configure("2") do |config|
     vb.memory = 1024
     vb.customize ["modifyvm", :id, "--groups", "/DNSLAB9"]
   end
- # nginx
-  config.vm.define :dns do |guest|
-    guest.vm.provider "virtualbox" do |vb, subconfig|
-      vb.name = "nginx"
-      subconfig.vm.hostname = "nginx.#{DOMAIN}"
-      subconfig.vm.network :private_network, ip: DNSIP,  virtualboxintnet: LAB # ,  name: RED #
-    end
-    guest.vm.provision "shell", name: "nginx", path: "nginx.sh", args: DNSIP
-  end
-
-
 
   # dns 
-  config.vm.define :dns do |guest|
-    guest.vm.provider "virtualbox" do |vb, subconfig| 
+  config.vm.define "dns" do |guest|
+    guest.vm.provider "virtualbox" do |vb, subconfig|
       vb.name = "dns"
       subconfig.vm.hostname = "dns.#{DOMAIN}"
       subconfig.vm.network :private_network, ip: DNSIP,  virtualboxintnet: LAB # ,  name: RED #
@@ -42,39 +43,41 @@ Vagrant.configure("2") do |config|
     guest.vm.provision "shell", name: "dns-server", path: "enable-bind9.sh", args: DNSIP
   end
 
-
+  #services
+  services.each_with_index do |(hostname, info),index|
+    puts hostname
+    config.vm.define hostname do |guest|
+      guest.vm.provider "virtualbox" do |vs, subconfig|
+        vs.name = hostname
+        subconfig.vm.hostname = hostname
+        subconfig.vm.network :private_network, ip: info[:ip], virtualboxintnet: LAB
+      end
+      guest.vm.provision "shell", name: "services", path: "enable-bind9.sh", args: DNSIP
+    end
+  end
   # clients DHCP
   (1..1).each do |id|
     config.vm.define "client#{id}" do |guest|
       guest.vm.provider "virtualbox" do |vb, subconfig|
         vb.name = "client#{id}"
+        if id>1
+          vb.gui = true
+          vb.cpus = 2
+          vb.memory = 2048
+          subconfig.vm.box = BOX_DESKTOP
+          subconfig.vbguest.auto_update = true
+        end
         subconfig.vm.hostname = "client#{id}.#{DOMAIN}"
-console.loc(siccxp  )
-        subconfig.vm.network :private_network, ip: "192.168.1.#{150+id}",  virtualboxintnet: LAB
+
+        subconfig.vm.network :private_network, ip: "192.168.33.#{150+id}",  virtualboxintnet: LAB
       end
       guest.vm.provision "shell", name: "dns-client", inline: $dnsclient, args: DNSIP
       guest.vm.provision "shell", name: "testing", inline: <<-SHELL
         dig google.com +short
-        dig -x 192.168.1.100 +short
-        ping -a -c 1 apache1
-        ping -a -c 1 apache2.aula104.local
-        # curl apache1 --no-progress-meter 
-        # curl apache2 --no-progress-meter 
-        # curl nginx --no-progress-meter 
-        ping -a -c 1 amazon.com
-     
-     
-
-    Vagrantfile
-    New
-
-vagrant init obihann/nginx \
-  --box-version 0.0.1
-vagrant up
-
-   ping -a -c 1 ns2
+        dig -x 192.168.1.10 +short
+        ping -a -c 1 google.com
+        ping -a -c 1 ns2
       SHELL
     end
   end
-
 end
